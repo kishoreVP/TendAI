@@ -1,0 +1,7 @@
+.env
+storage/
+__pycache__/
+*.pyc
+.pytest_cache/
+# procurement documents never go into the repository
+data/

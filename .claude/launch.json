@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gammaprime",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "gammaprime", "serve"],
+      "port": 8000
+    }
+  ]
+}

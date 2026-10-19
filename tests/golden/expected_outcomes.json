@@ -1,0 +1,43 @@
+{
+  "cable_m246": {
+    "coromandel": {
+      "dc resistance": "MEETS_REQUIREMENT",
+      "turnover": "MEETS_REQUIREMENT",
+      "supplied": "MEETS_REQUIREMENT",
+      "earnest money": "MEETS_REQUIREMENT",
+      "ac resistance": "MEETS_REQUIREMENT",
+      "type of cable": "MEETS_REQUIREMENT"
+    },
+    "meridian": {
+      "dc resistance": "DOES_NOT_MEET_REQUIREMENT",
+      "turnover": "DOES_NOT_MEET_REQUIREMENT",
+      "insulation - minimum": "DOES_NOT_MEET_REQUIREMENT",
+      "ac resistance": "DOES_NOT_MEET_REQUIREMENT",
+      "supplied": "MEETS_REQUIREMENT"
+    },
+    "vajra": {
+      "dc resistance": "INSUFFICIENT_EVIDENCE",
+      "strands": "REQUIRES_HUMAN_REVIEW",
+      "ac resistance": "MEETS_REQUIREMENT",
+      "type of cable": "REQUIRES_HUMAN_REVIEW",
+      "supplied": "DOES_NOT_MEET_REQUIREMENT",
+      "earnest money": "REQUIRES_HUMAN_REVIEW",
+      "turnover": "REQUIRES_HUMAN_REVIEW"
+    }
+  },
+  "pwd_tiruchengode": {
+    "murugan": {
+      "completion": "MEETS_REQUIREMENT",
+      "earnest money": "MEETS_REQUIREMENT",
+      "class": "MEETS_REQUIREMENT",
+      "indemnity": "MEETS_REQUIREMENT"
+    },
+    "kaveri": {
+      "completion": "DOES_NOT_MEET_REQUIREMENT",
+      "earnest money": "DOES_NOT_MEET_REQUIREMENT",
+      "class": "DOES_NOT_MEET_REQUIREMENT",
+      "indemnity": "INSUFFICIENT_EVIDENCE",
+      "turnover certificate": "REQUIRES_HUMAN_REVIEW"
+    }
+  }
+}
