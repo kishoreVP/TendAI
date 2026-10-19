@@ -7,9 +7,9 @@
 * LocalProvider: any OpenAI-compatible local server, intended for llama.cpp `llama-server`
   running a small Qwen GGUF on a Jetson Orin Nano (see docs/JETSON.md).
 
-Routing: GP_TASK_ROUTING maps task -> provider name, GP_DEFAULT_PROVIDER is the fallback
+Routing: TENDAI_TASK_ROUTING maps task -> provider name, TENDAI_DEFAULT_PROVIDER is the fallback
 ("none" disables the LLM). Bidder documents never go to a cloud provider unless
-GP_ALLOW_CLOUD_FOR_BIDDER_DOCS=true. There is no silent fallback to another provider/model.
+TENDAI_ALLOW_CLOUD_FOR_BIDDER_DOCS=true. There is no silent fallback to another provider/model.
 """
 import json
 import time
@@ -132,5 +132,5 @@ def get_provider(task, contains_bidder_data):
     provider = PROVIDERS[name]()
     if provider.cloud and contains_bidder_data and not config.ALLOW_CLOUD_FOR_BIDDER_DOCS:
         raise LLMError(f"task '{task}' would send bidder documents to cloud provider '{name}', but "
-                       "GP_ALLOW_CLOUD_FOR_BIDDER_DOCS is not true")
+                       "TENDAI_ALLOW_CLOUD_FOR_BIDDER_DOCS is not true")
     return provider

@@ -1,7 +1,7 @@
 """Benchmark a configured LLM provider on requirement extraction from real tender clauses.
 
-    GP_DEFAULT_PROVIDER=local GP_LOCAL_LLM_URL=http://jetson.local:8080/v1 python scripts/bench_llm.py
-    GP_DEFAULT_PROVIDER=groq  GROQ_API_KEY=...                              python scripts/bench_llm.py
+    TENDAI_DEFAULT_PROVIDER=local TENDAI_LOCAL_LLM_URL=http://jetson.local:8080/v1 python scripts/bench_llm.py
+    TENDAI_DEFAULT_PROVIDER=groq  GROQ_API_KEY=...                              python scripts/bench_llm.py
 
 Reports load/first-call latency, per-clause latency, structured-output validity, grounding
 rate (quotes found verbatim) and whether the expected threshold was recovered. Memory must be
@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from gammaprime import llm, requirements  # noqa: E402
-from gammaprime.db import Node  # noqa: E402
+from tendai import llm, requirements  # noqa: E402
+from tendai.db import Node  # noqa: E402
 
 CLAUSES = [  # verbatim from the sample tenders, with the value a correct extraction must contain
     ("3. The Annual Turnover of the Tenderer shall be more than Rs.21.80Cr. ( Rupees Twenty one core and eighty "
@@ -34,7 +34,7 @@ class Case:
 def main():
     provider = llm.get_provider("requirement_extraction", contains_bidder_data=False)
     if provider is None:
-        sys.exit("Set GP_DEFAULT_PROVIDER=local or groq (see .env.example)")
+        sys.exit("Set TENDAI_DEFAULT_PROVIDER=local or groq (see .env.example)")
     print(f"provider={provider.name} model={provider.model}")
     stats = {"ok": 0, "grounded": 0, "found": 0, "errors": 0, "latency": []}
     for i, (text, expect) in enumerate(CLAUSES):

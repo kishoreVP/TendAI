@@ -42,7 +42,8 @@ def attributes(text):
     a = {}
     if m := re.search(r"(\d+(?:\.\d+)?)\s*kv\b", t):
         a["kv"] = float(m.group(1))
-    if m := re.search(r"(\d+(?:\s*1/2)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*sq", t):
+    # "3 1/2 x 25 sq.mm" or "12 core 2.5 sq.mm"
+    if m := re.search(r"(\d+(?:\s*1/2)?)\s*(?:[x×]|cores?)\s*(\d+(?:\.\d+)?)\s*sq", t):
         a["cores"], a["size_sqmm"] = m.group(1).replace(" ", ""), float(m.group(2))
     for k in ("aluminium", "copper"):
         if k in t:
@@ -143,7 +144,8 @@ def normalise_rate(rate, from_unit, to_unit):
     return rate * factor, steps
 
 
-WORK_RE = re.compile(r"\b(fixing|laying|erection|installation|run of|clamping|wiring|testing|commissioning)\b", re.I)
+# installation work in an item ("clarnping" is a typo in the real PWD BOQ)
+WORK_RE = re.compile(r"\b(fixing|laying|erection|installation|run of|clamping|clarnping|wiring|testing|commissioning)\b", re.I)
 
 
 def match_item(desc, unit, benchmarks):
@@ -175,6 +177,9 @@ def match_item(desc, unit, benchmarks):
         missing = [k for k in item if k not in rec["attributes"]]
         if missing:
             notes.append(f"attributes not stated in reference: {', '.join(missing)}")
+        unstated = [k for k in rec["attributes"] if k not in item and k != "grade"]
+        if unstated:  # e.g. BOQ does not say aluminium or copper: prices can differ several-fold
+            notes.append(f"BOQ item does not specify: {', '.join(unstated)}")
         entry["notes"] = notes
         (result["partial"] if notes else result["comparable"]).append(entry)
     for k in ("comparable", "partial"):  # more matched technical attributes first, then wording

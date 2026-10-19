@@ -11,7 +11,7 @@ from .schemas import Claim, Requirement
 RULE_ENGINE_VERSION = "1.0"
 MEETS, FAILS, INSUFFICIENT, REVIEW, NA = ("MEETS_REQUIREMENT", "DOES_NOT_MEET_REQUIREMENT", "INSUFFICIENT_EVIDENCE",
                                           "REQUIRES_HUMAN_REVIEW", "NOT_APPLICABLE")
-STOP = {"shall", "be", "with", "the", "of", "and", "process", "to", "as", "per", "is", "a", "on", "in", "grade"}
+STOP = {"shall", "will", "be", "with", "the", "of", "and", "process", "to", "as", "per", "is", "a", "on", "in", "grade"}
 
 
 def _src(c: Claim):
@@ -33,7 +33,7 @@ def text_matches(required, offered):
     if len(alts) > 1 and any(text_matches(a, offered) for a in alts):
         return True
     have = _norm_tokens(offered)
-    for word in re.findall(r"[A-Za-z0-9/]+", required):
+    for word in re.findall(r"[a-z0-9/]+", required.lower().replace("-", "")):  # same normalisation as offer
         options = {w for w in _norm_tokens(word.replace("/", " "))}
         if options and not options & have:
             return False
@@ -57,6 +57,8 @@ def _judge(req: Requirement, c: Claim):
         ok = c.value in (rule.permitted_values or [])
         return (MEETS if ok else FAILS), f"'{c.value}' {'is' if ok else 'is not'} in {rule.permitted_values}"
     if not isinstance(c.value, (int, float)):
+        if c.unit and c.unit != rule.unit:
+            return REVIEW, f"bidder states {_src(c)}; {c.unit} cannot be converted exactly to {rule.unit}"
         return INSUFFICIENT, f"no numeric value in {_src(c)}"
     v, t = float(c.value), float(rule.value)
     unit = f" {rule.unit}" if rule.unit else ""
@@ -105,7 +107,8 @@ def evaluate(req: Requirement, claims: list[Claim]):
     statuses = {s for _, s, _ in informative}
     detail = "; ".join(f"{r} - {_src(c)}" for c, s, r in informative)
     if len(statuses) > 1:
-        return REVIEW, f"Contradictory evidence: {detail}", calc
+        kind = "Contradictory evidence" if {MEETS, FAILS} <= statuses else "Evidence values differ"
+        return REVIEW, f"{kind}: {detail}", calc
     status = statuses.pop()
     if any(c.verification_status == "ai_extracted" for c, _, _ in informative) and status != INSUFFICIENT:
         return REVIEW, f"Value extracted by AI, needs confirmation ({status}): {detail}", calc

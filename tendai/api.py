@@ -1,4 +1,4 @@
-"""HTTP API + static web UI.   uvicorn gammaprime.api:app --reload
+"""HTTP API + static web UI.   uvicorn tendai.api:app --reload
 
 Access control is a placeholder: the reviewer name comes from the X-User header. A real
 deployment needs authentication and per-case authorisation in front of this.
@@ -17,7 +17,7 @@ from .db import (AuditEvent, Benchmark, Bidder, Case, Document, Evidence, Node, 
                  Result, Run, TemplateVersion, audit, make_session_factory)
 from .ingest import IngestError, get_bidder, get_case, ingest
 
-app = FastAPI(title="GammaPrime.ai")
+app = FastAPI(title="TendAI")
 Session = make_session_factory()
 WEB = Path(__file__).parent / "web"
 
@@ -187,7 +187,33 @@ def export(run_id: int, fmt: str, s=Depends(db)):
         raise HTTPException(400, "format: json, csv, xlsx or pdf")
     data, media = makers[fmt](s, run)
     return Response(data, media_type=media,
-                    headers={"Content-Disposition": f'attachment; filename="gammaprime_run{run_id}.{fmt}"'})
+                    headers={"Content-Disposition": f'attachment; filename="tendai_run{run_id}.{fmt}"'})
+
+
+@app.get("/api/runs/{run_id}/bidders/{bidder_id}/evidence-pack.pdf")
+def bidder_evidence_pack(run_id: int, bidder_id: int, s=Depends(db)):
+    data = exports.evidence_pack(s, _get(s, Run, run_id), bidder_id)
+    return Response(data, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="evidence_pack_run{run_id}_bidder{bidder_id}.pdf"'})
+
+
+@app.get("/api/documents/{doc_id}/snippet.png")
+def snippet(doc_id: int, page: int, bbox: str, s=Depends(db)):
+    """Rendered, highlighted crop of a PDF region (visual proof shown next to each finding)."""
+    d = _get(s, Document, doc_id)
+    try:
+        box = [float(x) for x in bbox.split(",")]
+        assert d.kind == "pdf" and len(box) == 4 and page >= 1
+        png = exports.snippet_png(d.path, page, box)
+    except (AssertionError, ValueError, IndexError):
+        raise HTTPException(400, "snippet needs a PDF document, a valid page and bbox=x0,y0,x1,y1")
+    return Response(png, media_type="image/png", headers={"Cache-Control": "max-age=3600"})
+
+
+@app.get("/api/benchmarks/{bench_id}")
+def get_benchmark(bench_id: int, s=Depends(db)):
+    b = _get(s, Benchmark, bench_id)
+    return {"id": b.id, "doc_id": b.doc_id, "review_status": b.review_status, **b.data}
 
 
 @app.get("/api/audit")
@@ -235,6 +261,15 @@ def get_node(node_id: int, s=Depends(db)):
 def _node(n):
     return {"id": n.id, "doc_id": n.doc_id, "kind": n.kind, "ref": n.ref, "text": n.text, "page": n.page,
             "regions": n.regions, "meta": n.meta}
+
+
+@app.middleware("http")
+async def revalidate_ui(request, call_next):
+    """Browsers must re-check the UI files so an updated app.js is never served stale."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 app.mount("/", StaticFiles(directory=WEB, html=True), name="web")

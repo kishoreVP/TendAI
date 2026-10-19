@@ -72,6 +72,10 @@ def parse_requirement_value(desc, value):
     if re.match(r"as per\b", v, re.I):
         return "text", "provided", Rule(op="provided", must_mention=None)
     op = _op_from_description(desc)
+    prefix = re.match(r"(min(?:imum)?|max(?:imum)?|nominal|approx\.?)\s+(?=\d)", v, re.I)
+    if prefix:  # "Min 2.36 mm", "Nominal 3.2 mm"
+        op = _op_from_description(prefix.group(1))
+        v = v[prefix.end():]
     qty = units.parse_quantities(v)
     bare = re.fullmatch(r"\s*" + units.NUM + r"\s*", v)
     if bare:
@@ -84,6 +88,23 @@ def parse_requirement_value(desc, value):
     return "text", "matches", Rule(op="matches", value=v)
 
 
+def table_row_titles(rows, desc_col, value_col):
+    """{row id: title}. Sub-rows such as 'Average:' under '13 Material and thickness of
+    Insulation' get their parent's description as a prefix. Used for the tender's table and
+    for the bidder's copy of it, so both sides produce the same titles."""
+    main, out = {}, {}
+    for r in rows:
+        cells = r.meta.get("cells", {})
+        sl, desc = (r.ref or "").strip(), cells.get(desc_col, "")
+        first = main.setdefault(sl, (desc, bool(cells.get(value_col))))
+        title = desc.rstrip(" :")
+        short = len(desc.split()) <= 3 or desc.strip().endswith(":")
+        if first[0] != desc and (short or not first[1]):
+            title = f"{first[0].rstrip(' :')} - {desc.rstrip(' :')}"
+        out[r.id] = title
+    return out
+
+
 def from_requirement_tables(case, nodes_by_parent, tables):
     reqs = []
     for t in tables:
@@ -93,16 +114,12 @@ def from_requirement_tables(case, nodes_by_parent, tables):
         if not req_col or not desc_col:
             continue
         rows = nodes_by_parent.get(t.id, [])
-        main = {}  # Sl.No -> (description, has_value) of first row with that number
+        titles = table_row_titles(rows, desc_col, req_col)
         seen = {}
         for r in rows:
             cells = r.meta.get("cells", {})
             sl, desc, value = (r.ref or "").strip(), cells.get(desc_col, ""), cells.get(req_col, "")
-            first = main.setdefault(sl, (desc, bool(value)))
-            title = desc.rstrip(" :")
-            short = len(desc.split()) <= 3 or desc.strip().endswith(":")
-            if first[0] != desc and (short or not first[1]):
-                title = f"{first[0].rstrip(' :')} - {desc.rstrip(' :')}"
+            title = titles[r.id]
             if not value or value == req_col:
                 continue
             rtype, op, rule = parse_requirement_value(desc, value)
@@ -139,6 +156,9 @@ def from_clauses(case, clauses, sections):
                 if extra:  # a later, more specific mention adds attributes (e.g. "with UDIN")
                     prev.evaluation_rule.must_mention = sorted(set(prev.evaluation_rule.must_mention or []) | extra)
                     prev.normalised_requirement += f" (with {', '.join(sorted(extra))}, per clause {req.source_clause})"
+                if req.mandatory_status == "conditional" and prev.mandatory_status == "mandatory":
+                    prev.mandatory_status = "conditional"  # "(if it is a firm)" in a later, more specific mention
+                    prev.applicability_conditions = f"{req.applicability_conditions} (clause {req.source_clause})"
             return
         found[req.requirement_id] = req
 
@@ -204,13 +224,17 @@ def from_clauses(case, clauses, sections):
                 continue
             after = text[dm.end(): dm.end() + 80]
             must = ["UDIN"] if re.search(r"UDIN", after) else None
-            cond = CONDITIONAL_DOC_RE.search(after[:40]) or re.search(r"exempt\w*", text, re.I)
+            before = text[max(0, dm.start() - 160): dm.start()]
+            cond = (CONDITIONAL_DOC_RE.search(after[:40]) or re.search(r"exempt\w*", text, re.I)
+                    or re.search(r"\b(in the event of|in case of|if the (tenderer|bidder) is)\b[^.]*$", before, re.I))
             put(_req(case, n, "DOC-" + re.sub(r"\W+", "-", name.upper()).strip("-"), "documents", name,
                      f"{name} must be submitted" + (" (with UDIN)" if must else ""), "documentary", "document",
                      Rule(op="document", document_keywords=[name], must_mention=must), "rule:document_list", 0.75,
                      mandatory_status="conditional" if cond else "mandatory",
                      applicability_conditions=(f"only applies {cond.group(0)}" if cond and cond.group(0).startswith("(")
-                                               else "only when claiming the exemption in this clause" if cond else None),
+                                               else "only when claiming the exemption in this clause"
+                                               if cond and cond.group(0).lower().startswith("exempt")
+                                               else f"conditional: '{cond.group(0)[:100]}'" if cond else None),
                      required_evidence_types=["third_party_document"]))
     # EMD exemption makes the EMD requirement conditional
     exempt = next((n for n in clauses if re.search(r"exempt", n.text, re.I) and
@@ -351,7 +375,10 @@ def extract_requirements(s, case, tender_docs, use_llm=True):
         _corroborate_with_spec_clauses(table_reqs, clauses)
         clause_reqs = list(from_clauses(case, clauses, sections).values())
         reqs += table_reqs + clause_reqs
-        provider = llm.get_provider("requirement_extraction", contains_bidder_data=False) if use_llm else None
+        try:
+            provider = llm.get_provider("requirement_extraction", contains_bidder_data=False) if use_llm else None
+        except llm.LLMError:
+            provider = None  # misconfigured provider: rules-only extraction, nothing invented
         if provider is not None:
             done = {r.source_node_id for r in reqs}
             for n in llm_candidates(case, clauses, sections, done):

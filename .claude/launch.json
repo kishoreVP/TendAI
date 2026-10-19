@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "gammaprime",
+      "name": "tendai",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "gammaprime", "serve"],
+      "runtimeArgs": ["-m", "tendai", "serve"],
       "port": 8000
     }
   ]

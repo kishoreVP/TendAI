@@ -10,9 +10,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from gammaprime import ingest  # noqa: E402
-from gammaprime.db import Node, make_session_factory  # noqa: E402
-from gammaprime.retrieval import ChunkIndex, NodeIndex  # noqa: E402
+from tendai import ingest  # noqa: E402
+from tendai.db import Node, make_session_factory  # noqa: E402
+from tendai.retrieval import ChunkIndex, NodeIndex  # noqa: E402
 
 PDF = Path(__file__).resolve().parents[1] / "data/samples/cable_m246/M246Spec.pdf"
 QUESTIONS = [  # (question, expected pages, expected table row "Sl.No|text fragment" or None)

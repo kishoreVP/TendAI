@@ -19,7 +19,7 @@ needs_samples = pytest.mark.skipif(not (CABLE / "M246Spec.pdf").exists() or not 
 
 @pytest.fixture(autouse=True)
 def isolated_storage(tmp_path, monkeypatch):
-    from gammaprime import config
+    from tendai import config
     monkeypatch.setattr(config, "STORAGE_DIR", tmp_path / "storage")
     monkeypatch.setattr(config, "DEFAULT_PROVIDER", "none")
     monkeypatch.setattr(config, "TASK_ROUTING", {})
@@ -27,7 +27,7 @@ def isolated_storage(tmp_path, monkeypatch):
 
 @pytest.fixture
 def session():
-    from gammaprime.db import make_session_factory
+    from tendai.db import make_session_factory
     s = make_session_factory("sqlite://")()
     yield s
     s.close()
@@ -46,6 +46,6 @@ def sor_extract(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def cable_tree():
-    from gammaprime import pdfparse
+    from tendai import pdfparse
     pages, tables = pdfparse.extract_pages(CABLE / "M246Spec.pdf")
     return pages, tables, pdfparse.build_tree(pages, tables)

@@ -5,8 +5,8 @@ import json
 import httpx
 import pytest
 
-from gammaprime import config, llm, requirements
-from gammaprime.db import Node
+from tendai import config, llm, requirements
+from tendai.db import Node
 
 
 class FakeResponse:
@@ -51,7 +51,7 @@ def test_missing_groq_key(monkeypatch):
 def test_cloud_blocked_for_bidder_documents(monkeypatch):
     monkeypatch.setattr(config, "GROQ_API_KEY", "test-key")
     monkeypatch.setattr(config, "TASK_ROUTING", {"evidence_mapping": "groq"})
-    with pytest.raises(llm.LLMError, match="GP_ALLOW_CLOUD_FOR_BIDDER_DOCS"):
+    with pytest.raises(llm.LLMError, match="TENDAI_ALLOW_CLOUD_FOR_BIDDER_DOCS"):
         llm.get_provider("evidence_mapping", contains_bidder_data=True)
     monkeypatch.setattr(config, "ALLOW_CLOUD_FOR_BIDDER_DOCS", True)
     assert llm.get_provider("evidence_mapping", contains_bidder_data=True).name == "groq"

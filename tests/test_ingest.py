@@ -1,8 +1,8 @@
 """Milestone 1: upload validation, storage, hashing, conversion."""
 import pytest
 
-from gammaprime import ingest
-from gammaprime.db import Document, Node
+from tendai import ingest
+from tendai.db import Document, Node
 
 from .conftest import CABLE, needs_samples
 

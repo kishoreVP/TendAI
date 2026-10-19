@@ -5,8 +5,8 @@ has been run on Jetson hardware yet.** The numbers to fill in below must come fr
 
 ## Design
 
-GammaPrime talks to any OpenAI-compatible `/v1/chat/completions` endpoint (`LocalProvider` in
-`gammaprime/llm.py`). On the Jetson that endpoint is llama.cpp's `llama-server`, so the app itself
+TendAI talks to any OpenAI-compatible `/v1/chat/completions` endpoint (`LocalProvider` in
+`tendai/llm.py`). On the Jetson that endpoint is llama.cpp's `llama-server`, so the app itself
 does not need CUDA, PyTorch or the Jetson software stack. It runs on a laptop/server, and the
 Jetson is only the model host. If the Jetson is offline, rule-based extraction still works.
 LLM tasks that are routed to it fail with a clear error and nothing silently switches to the cloud.
@@ -22,7 +22,7 @@ retries once before reporting an error.
 | Qwen2.5-1.5B-Instruct | ~1.0 GB | fits easily in 8 GB shared memory, fastest |
 | Qwen2.5-3B-Instruct | ~1.9 GB | better extraction quality; still leaves room for a 8k context KV cache |
 
-Start with 3B Q4_K_M and a context of 4096 tokens; clause-level prompts in GammaPrime are short
+Start with 3B Q4_K_M and a context of 4096 tokens; clause-level prompts in TendAI are short
 (< 1k tokens). Check the model card licence before redistribution (Qwen2.5-3B uses the Qwen
 Research licence; 1.5B is Apache-2.0).
 
@@ -40,11 +40,11 @@ Research licence; 1.5B is Apache-2.0).
    ```bash
    ./build/bin/llama-server -m Qwen2.5-3B-Instruct-Q4_K_M.gguf -ngl 99 -c 4096 --host 0.0.0.0 --port 8080
    ```
-4. On the GammaPrime machine: `GP_DEFAULT_PROVIDER=local GP_LOCAL_LLM_URL=http://<jetson>:8080/v1`.
+4. On the TendAI machine: `TENDAI_DEFAULT_PROVIDER=local TENDAI_LOCAL_LLM_URL=http://<jetson>:8080/v1`.
 
 ## Test profile (fill in from real runs)
 
-Run `python scripts/bench_llm.py` from the GammaPrime machine while `sudo tegrastats` runs on the Jetson.
+Run `python scripts/bench_llm.py` from the TendAI machine while `sudo tegrastats` runs on the Jetson.
 
 | Metric | Value | How measured |
 |---|---|---|
@@ -63,8 +63,8 @@ Deterministic rules handle everything the sample tenders needed. Use the LLM onl
 rules don't understand (`llm_candidates` in `requirements.py`) and for unparsed bidder passages:
 
 ```env
-GP_TASK_ROUTING={"requirement_extraction": "groq", "evidence_mapping": "local"}
-GP_ALLOW_CLOUD_FOR_BIDDER_DOCS=false
+TENDAI_TASK_ROUTING={"requirement_extraction": "groq", "evidence_mapping": "local"}
+TENDAI_ALLOW_CLOUD_FOR_BIDDER_DOCS=false
 ```
 
 Here tender text (public) may go to Groq, and confidential bidder text stays on the Jetson.

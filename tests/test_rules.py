@@ -1,10 +1,10 @@
 """Milestones 4 and 5 (unit level): units, rules, benchmark matching. No documents needed."""
 import pytest
 
-from gammaprime import benchmarks as bm
-from gammaprime import evaluate as ev
-from gammaprime import units
-from gammaprime.schemas import Claim, Requirement, Rule
+from tendai import benchmarks as bm
+from tendai import evaluate as ev
+from tendai import units
+from tendai.schemas import Claim, Requirement, Rule
 
 
 @pytest.mark.parametrize("text,value,unit", [
@@ -118,8 +118,8 @@ def test_price_normalisation_is_exact_and_recorded():
 
 
 def test_sor_extract_records(session, sor_extract):
-    from gammaprime import ingest
-    from gammaprime.db import Node
+    from tendai import ingest
+    from tendai.db import Node
     doc = ingest.ingest(session, ingest.get_case(session, "c"), sor_extract, "benchmark")
     nodes = session.query(Node).filter_by(doc_id=doc.id).order_by(Node.seq).all()
     recs = {r.code: r for r in bm.from_sor_nodes(nodes, "TN PWD", "2025-07-22")}

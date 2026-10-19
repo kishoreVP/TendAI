@@ -7,8 +7,8 @@ import openpyxl
 import pymupdf
 import pytest
 
-from gammaprime import config, exports, pipeline
-from gammaprime.db import Document, Node, Requirement, Result, make_session_factory
+from tendai import config, exports, pipeline
+from tendai.db import Document, Node, Requirement, Result, make_session_factory
 
 from .conftest import CABLE, GOLDEN, HIST, PWD, needs_samples
 
@@ -138,10 +138,34 @@ def test_exports(world):
     data, _ = exports.to_xlsx(s, run)
     wb = openpyxl.load_workbook(io.BytesIO(data))
     assert wb.sheetnames == ["Compliance matrix", "Commercial", "Template"]
-    assert wb["Compliance matrix"].max_row == 1 + len(runs["pwd_tiruchengode"][1].requirements) * 2
+    n_bidders = len(exports.run_report(s, run)["bidders"])
+    assert wb["Compliance matrix"].max_row == 1 + len(runs["pwd_tiruchengode"][1].requirements) * n_bidders
     pdf, _ = exports.to_pdf(s, run)
     assert pdf.startswith(b"%PDF") and pymupdf.open(stream=pdf).page_count >= 1
     csv_bytes, _ = exports.to_csv(s, run)
     assert b"pending human review" in csv_bytes
     rep = json.loads(exports.to_json(s, run)[0])
     assert rep["run"]["config"]["rule_engine_version"] and rep["audit"]
+
+
+def test_snapshots_and_evidence_pack(world):
+    """Visual grounding outside the viewer: highlighted crops and the per-bidder evidence pack."""
+    s, runs = world
+    rep, _ = _results(s, runs["cable_m246"][2])
+    meridian = next(b["id"] for b in rep["bidders"] if b["name"] == "meridian")
+    r = next(r for r in rep["results"] if r["bidder"] == "meridian" and r["requirement_key"] == "GTP-6")
+    e = r["evidence"][0]
+    g = exports.first_pdf_region(e["source_regions"])
+    png = exports.snippet_png(s.get(Document, e["source_document_id"]).path, g["page"], g["bbox"])
+    assert png.startswith(b"\x89PNG")
+    pack = pymupdf.open(stream=exports.evidence_pack(s, runs["cable_m246"][2], meridian))
+    assert "GTP-6" in "".join(p.get_text() for p in pack)
+    assert sum(len(p.get_images()) for p in pack) >= 8  # tender + bidder crop per finding
+
+
+def test_document_evidence_covers_whole_section(world):
+    s, runs = world
+    rep, _ = _results(s, runs["pwd_tiruchengode"][2])
+    r = next(r for r in rep["results"] if r["bidder"] == "murugan" and r["requirement_key"] == "DOC-INDEMNITY-BOND")
+    box = r["evidence"][0]["source_regions"][0]["bbox"]
+    assert box[3] - box[1] > 40  # heading + body text, not just the heading line

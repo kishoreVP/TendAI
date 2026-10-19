@@ -1,8 +1,8 @@
 """Milestone 2: requirement extraction against manually verified values from the tenders."""
 import pytest
 
-from gammaprime import ingest, requirements
-from gammaprime.schemas import Requirement
+from tendai import ingest, requirements
+from tendai.schemas import Requirement
 
 from .conftest import CABLE, PWD, needs_samples
 
@@ -11,8 +11,8 @@ pytestmark = needs_samples
 
 @pytest.fixture(scope="module")
 def reqs(tmp_path_factory):
-    from gammaprime import config
-    from gammaprime.db import make_session_factory
+    from tendai import config
+    from tendai.db import make_session_factory
     config.STORAGE_DIR = tmp_path_factory.mktemp("s")
     s = make_session_factory("sqlite://")()
     out = {}

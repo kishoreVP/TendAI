@@ -2,7 +2,7 @@
 (baseline: Docling output in codes/extraction_practice/debug_document.md) and coordinates."""
 import pymupdf
 
-from gammaprime import pdfparse
+from tendai import pdfparse
 
 from .conftest import needs_samples
 

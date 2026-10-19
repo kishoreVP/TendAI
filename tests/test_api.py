@@ -9,8 +9,8 @@ from .conftest import CABLE, HIST, needs_samples
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("GP_DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
-    from gammaprime import api, config
+    monkeypatch.setenv("TENDAI_DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
+    from tendai import api, config
     monkeypatch.setattr(config, "DATABASE_URL", f"sqlite:///{tmp_path / 'api.db'}")
     importlib.reload(api)
     return TestClient(api.app, headers={"X-User": "alice"})
@@ -51,7 +51,8 @@ def test_full_workflow(client):
     run = client.post(f"/api/templates/{tv['id']}/runs").json()
     rep = client.get(f"/api/runs/{run['id']}").json()
     assert {r["requirement_key"]: r["auto_status"] for r in rep["results"]} == {
-        "TURNOVER": "DOES_NOT_MEET_REQUIREMENT", "GTP-6": "DOES_NOT_MEET_REQUIREMENT", "EMD": "MEETS_REQUIREMENT"}
+        "TURNOVER": "DOES_NOT_MEET_REQUIREMENT", "GTP-6": "DOES_NOT_MEET_REQUIREMENT",
+        "EMD": "INSUFFICIENT_EVIDENCE"}  # Meridian's EMD receipt is a scan without a text layer
     res = rep["results"][0]
     assert client.post(f"/api/results/{res['id']}/decision", json={"final_status": "MEETS_REQUIREMENT", "reason": ""}).status_code == 400
     assert client.post(f"/api/results/{res['id']}/decision",

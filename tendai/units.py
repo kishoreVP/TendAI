@@ -87,3 +87,8 @@ def convert(value, from_unit, to_unit):
 
 def dimension(unit):
     return UNITS.get(unit, (None,))[0]
+
+
+def inexact_pair(a, b):
+    """Units of the same quantity whose conversion is not exact (months vs days)."""
+    return {dimension(a), dimension(b)} == {"days", "months"}

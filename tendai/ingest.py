@@ -108,7 +108,7 @@ def ingest(s, case, src_path, role, bidder=None, filename=None, actor="system"):
         s.flush()
         raise IngestError(f"Could not parse {filename}: {e}") from e
     _save_nodes(s, doc, nodes)
-    doc.meta = {**meta, "parse_seconds": round(time.perf_counter() - t0, 2), "parser": "pymupdf+gammaprime"}
+    doc.meta = {**meta, "parse_seconds": round(time.perf_counter() - t0, 2), "parser": "pymupdf+tendai"}
     doc.warnings = [f"page {n['page']}: {n['text']}" for n in nodes if n["kind"] == "warning"]
     doc.status = "parsed"
     audit(s, actor, "ingest", "document", doc.id, filename=filename, sha256=digest, role=role, nodes=len(nodes))

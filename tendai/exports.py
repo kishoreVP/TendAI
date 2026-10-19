@@ -136,7 +136,7 @@ def to_pdf(s, run):
     st = getSampleStyleSheet()
     small = st["BodyText"].clone("small", fontSize=7, leading=9)
     esc = lambda t: str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    story = [Paragraph(f"GammaPrime evaluation report - run {run.id}", st["Title"]),
+    story = [Paragraph(f"TendAI evaluation report - run {run.id}", st["Title"]),
              Paragraph("Decision-support output. Statuses marked 'pending human review' are proposals, "
                        "not authorised decisions.", st["Italic"]),
              Paragraph(f"Template version {rep['template']['version']} approved by {esc(rep['template']['approved_by'])}; "
@@ -162,3 +162,77 @@ def to_pdf(s, run):
     buf = io.BytesIO()
     SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=20, rightMargin=20).build(story)
     return buf.getvalue(), "application/pdf"
+
+
+# ------------------------------------------------------- visual evidence
+def snippet_png(path, page_no, bbox, pad=14, dpi=130):
+    """PNG of a PDF region with the region itself highlighted - the visual proof of a finding.
+    bbox is in displayed-page coordinates (as stored on nodes)."""
+    import pymupdf
+    doc = pymupdf.open(path)
+    page = doc[page_no - 1]
+    rect = pymupdf.Rect(bbox) * ~page.rotation_matrix  # back to unrotated page space
+    page.draw_rect(rect, color=(0.95, 0.65, 0), fill=(1, 0.85, 0.2), fill_opacity=0.28, width=1.2)
+    clip = pymupdf.Rect(rect.x0 - pad, rect.y0 - pad, rect.x1 + pad, rect.y1 + pad) & page.cropbox
+    if page.rotation == 0:  # full width keeps the table / sentence context around the value
+        clip.x0, clip.x1 = page.cropbox.x0 + 10, page.cropbox.x1 - 10
+    png = page.get_pixmap(clip=clip, dpi=dpi).tobytes("png")
+    doc.close()
+    return png
+
+
+def first_pdf_region(regions):
+    return next((g for g in regions or [] if g.get("page") and g.get("bbox")), None)
+
+
+def evidence_pack(s, run, bidder_id):
+    """Per-bidder PDF: summary, then every finding that is not a clean pass, each with the
+    tender clause and the bidder's evidence rendered from the source documents."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Image, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table
+
+    rep = run_report(s, run)
+    bidder = next(b["name"] for b in rep["bidders"] if b["id"] == bidder_id)
+    reqs = {r["requirement_id"]: r for r in rep["requirements"]}
+    docs = {d["id"]: d for d in rep["documents"]}
+    st = getSampleStyleSheet()
+    esc = lambda t: str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    colour = {"MEETS_REQUIREMENT": "#17602f", "DOES_NOT_MEET_REQUIREMENT": "#a02622",
+              "INSUFFICIENT_EVIDENCE": "#7a5600", "REQUIRES_HUMAN_REVIEW": "#204a97"}
+
+    def image(doc_id, regions, width):
+        g = first_pdf_region(regions)
+        doc = s.get(Document, doc_id)
+        if not g or doc is None or doc.kind != "pdf":
+            return Paragraph("<i>no PDF region (spreadsheet / not located)</i>", st["BodyText"])
+        img = Image(io.BytesIO(snippet_png(doc.path, g["page"], g["bbox"])))
+        img.drawWidth, img.drawHeight = width, width * img.imageHeight / img.imageWidth
+        return img
+
+    mine = [r for r in rep["results"] if r["bidder"] == bidder]
+    counts = Counter(r["status"] for r in mine)
+    story = [Paragraph(f"TendAI evidence pack - {esc(bidder)}", st["Title"]),
+             Paragraph(f"Run {run.id}, template v{rep['template']['version']}. Proposed statuses; final only after "
+                       "a named reviewer records a decision.", st["Italic"]), Spacer(1, 6),
+             Paragraph(" &nbsp; ".join(f"<font color='{colour.get(k, '#333')}'><b>{v}</b> {k.replace('_', ' ').lower()}</font>"
+                                       for k, v in counts.items()), st["BodyText"]), Spacer(1, 10)]
+    order = ["DOES_NOT_MEET_REQUIREMENT", "REQUIRES_HUMAN_REVIEW", "INSUFFICIENT_EVIDENCE"]
+    for r in sorted([r for r in mine if r["status"] in order], key=lambda r: order.index(r["status"])):
+        q = reqs[r["requirement_key"]]
+        ev = r["evidence"][0] if r["evidence"] else None
+        head = Paragraph(f"<font color='{colour[r['status']]}'><b>{r['status'].replace('_', ' ')}</b></font> - "
+                         f"<b>{esc(q['requirement_id'])}</b> {esc(q['title'])}", st["Heading4"])
+        why = Paragraph(esc(r["explanation"])[:600], st["BodyText"])
+        tender = [Paragraph(f"<b>Tender</b> - {esc(docs[q['source_document_id']]['filename'])} p.{q.get('source_page')}",
+                            st["BodyText"]), image(q["source_document_id"], q["source_regions"], 250)]
+        bid = [Paragraph(f"<b>Bidder</b> - {esc(docs[ev['source_document_id']]['filename'])} p.{ev.get('source_page')}"
+                         if ev else "<b>Bidder</b> - no evidence found", st["BodyText"]),
+               image(ev["source_document_id"], ev["source_regions"], 250) if ev else Spacer(1, 1)]
+        grid = Table([[tender, bid]], colWidths=[262, 262])
+        grid.setStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("BOX", (0, 0), (-1, -1), 0.4, colors.lightgrey)])
+        story.append(KeepTogether([head, why, Spacer(1, 4), grid, Spacer(1, 12)]))
+    buf = io.BytesIO()
+    SimpleDocTemplate(buf, pagesize=A4, leftMargin=30, rightMargin=30, title=f"Evidence pack {bidder}").build(story)
+    return buf.getvalue()
